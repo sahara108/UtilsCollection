@@ -11,11 +11,7 @@ import JavaScriptCore
 
 final class JSDataProvider {
   private typealias Job = ()->()
-  private lazy var thread: Thread = {
-    let workingThread = Thread(target: self, selector: #selector(JSDataProvider.main), object: nil)
-    workingThread.qualityOfService = .utility
-    return workingThread
-  }()
+  private var thread: Thread?
   
   private var queue: [RunloopSource.RunloopSourceContext] = []
   
@@ -23,7 +19,23 @@ final class JSDataProvider {
   }
   
   public func start() {
-    thread.start()
+    if thread == nil {
+      let workingThread = Thread(target: self, selector: #selector(JSDataProvider.main), object: nil)
+      workingThread.qualityOfService = .utility
+      thread = workingThread
+      
+      thread?.start()
+    }
+  }
+  
+  public func stop() {
+    thread?.cancel()
+    thread = nil
+    
+    if queue.count > 0 {
+      let sourceInfo = queue[0]
+      sourceInfo.source.stop(runloop: sourceInfo.runloop)
+    }
   }
   
   private func execute(_ job: @escaping Job) throws {
@@ -35,7 +47,7 @@ final class JSDataProvider {
       return
     }
     let sourceInfo = queue[0]
-//    sourceInfo.source.data.append(number)
+    sourceInfo.source.addCommand(number)
     sourceInfo.source.fireCommandsOnRunLoop(runloop: sourceInfo.runloop)
   }
   
@@ -44,7 +56,7 @@ final class JSDataProvider {
   }
   
   fileprivate func removeSource(sourceInfo: RunloopSource.RunloopSourceContext) {
-    if let index = queue.firstIndex(where: {$0 == sourceInfo}) {
+    if let index = queue.firstIndex(where: {$0.source === sourceInfo.source}) {
       queue.remove(at: index)
     }
   }
@@ -53,8 +65,8 @@ final class JSDataProvider {
   @objc private func main() {
     var done = false
     //        var virtualMachine = JSVirtualMachine()
-    let customRunloop = RunloopSource(provider: self)
-    customRunloop.addToCurrentRunloop()
+    var customRunloop: RunloopSource? = RunloopSource(provider: self)
+    customRunloop?.addToCurrentRunloop()
     
     while !done {
       let result = CFRunLoopRunInMode(CFRunLoopMode.defaultMode, 10, true)
@@ -64,8 +76,7 @@ final class JSDataProvider {
     }
     
     //release resource
-    //        context = nil
-    //        virtualMachine = nil
+    customRunloop = nil
   }
 }
 
@@ -80,14 +91,38 @@ private class RunloopSource: NSObject {
       
       super.init()
     }
+    
+    deinit {
+      CFRunLoopStop(runloop)
+    }
   }
   
   private let commandQueue = DispatchQueue(label: "runloopSourceCommandQueue")
+  private let commandQueueKey = DispatchSpecificKey<Void>()
   private var data: [Any] = []
   public func addCommand(_ command: Any) {
-    commandQueue.async { [weak self] in
-      self?.data.append(command)
+    if DispatchQueue.getSpecific(key: commandQueueKey) == nil {
+      commandQueue.async { [weak self] in
+        self?.data.append(command)
+      }
+    } else {
+      data.append(command)
     }
+  }
+  
+  private func poll() -> Any? {
+    var result: Any? = nil
+    if DispatchQueue.getSpecific(key: commandQueueKey) == nil {
+      commandQueue.sync { [weak self] in
+        guard let this = self else { return }
+        if this.data.count > 0 {
+          result = this.data.removeFirst()
+        }
+      }
+    } else {
+      result = data.removeFirst()
+    }
+    return result
   }
   
   weak var provider: JSDataProvider?
@@ -96,6 +131,10 @@ private class RunloopSource: NSObject {
     self.provider = provider
     super.init()
     self.setup()
+  }
+  
+  deinit {
+    runloopSource = nil
   }
   
   private func setup() {
@@ -126,7 +165,8 @@ private class RunloopSource: NSObject {
       inputSource.sourceFired()
     }
     
-    runloopSource = CFRunLoopSourceCreate(nil, 0, &context);
+    runloopSource = CFRunLoopSourceCreate(nil, 0, &context)
+    commandQueue.setSpecific(key: commandQueueKey, value: ())
   }
   
   func addToCurrentRunloop() {
@@ -135,18 +175,27 @@ private class RunloopSource: NSObject {
   }
   
   func fireCommandsOnRunLoop(runloop: CFRunLoop) {
-    if CFRunLoopIsWaiting(runloop) {
-      CFRunLoopSourceSignal(runloopSource)
-      CFRunLoopWakeUp(runloop)
-    }
+    CFRunLoopSourceSignal(runloopSource)
+    CFRunLoopWakeUp(runloop)
+  }
+  
+  func stop(runloop: CFRunLoop) {
+    CFRunLoopSourceInvalidate(runloopSource)
+    CFRunLoopRemoveSource(runloop, runloopSource, CFRunLoopMode.defaultMode)
+    CFRunLoopStop(runloop)
   }
   
   func sourceFired() {
-    if data.count > 0 {
-      let v = data.removeFirst()
-      print("start working on thread: \(Thread.current) with data: \(String(describing: v))")
+    if let command = poll() {
+      executeCommand(command: command)
+      
+      //after finish the job, try to poll next command
+      CFRunLoopSourceSignal(runloopSource)
     }
-    
+  }
+  
+  func executeCommand(command: Any) {
+    print("start working on thread: \(Thread.current) with data: \(String(describing: command))")
   }
 }
 

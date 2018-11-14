@@ -52,16 +52,16 @@ class ViewController: UIViewController {
             }
         }
         
-//        DispatchQueue.global().asyncAfter(deadline: .now() + 4) {
-//            print("+++++++++++ start new test after 4 seconds in main background")
-//            for i in 0..<20 {
-//                self.provider.test(number: i)
-//            }
-//        }
+        DispatchQueue.global().asyncAfter(deadline: .now() + 4) {
+            print("+++++++++++ start new test after 4 seconds in main background")
+            for i in 10..<20 {
+                self.provider.test(number: i)
+            }
+        }
     }
   
   @objc func openVideoComposition() {
-    
+    provider.stop()
   }
 }
 
