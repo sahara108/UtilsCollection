@@ -24,6 +24,19 @@ class ViewController: UIViewController {
         button.heightAnchor.constraint(equalToConstant: 50).isActive = true
         
         button.addTarget(self, action: #selector(doSomething), for: .touchUpInside)
+      
+      let secondButton = UIButton(type: .custom)
+      secondButton.setTitle("Video", for: .normal)
+      secondButton.setTitleColor(UIColor.green, for: .normal)
+      secondButton.translatesAutoresizingMaskIntoConstraints = false
+      
+      view.addSubview(secondButton)
+      secondButton.centerXAnchor.constraint(equalTo: view.centerXAnchor).isActive = true
+      secondButton.topAnchor.constraint(equalTo: button.bottomAnchor, constant: 10).isActive = true
+      secondButton.widthAnchor.constraint(equalToConstant: 50).isActive = true
+      secondButton.heightAnchor.constraint(equalToConstant: 50).isActive = true
+      
+      secondButton.addTarget(self, action: #selector(openVideoComposition), for: .touchUpInside)
     }
 
     @objc func doSomething() {
@@ -46,5 +59,9 @@ class ViewController: UIViewController {
 //            }
 //        }
     }
+  
+  @objc func openVideoComposition() {
+    
+  }
 }
 
