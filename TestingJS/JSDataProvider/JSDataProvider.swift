@@ -56,7 +56,7 @@ final class JSDataProvider {
   }
   
   fileprivate func removeSource(sourceInfo: RunloopSource.RunloopSourceContext) {
-    if let index = queue.firstIndex(where: {$0.source === sourceInfo.source}) {
+    if let index = queue.index(where: {$0.source === sourceInfo.source}) {
       queue.remove(at: index)
     }
   }
