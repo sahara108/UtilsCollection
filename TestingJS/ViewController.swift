@@ -9,59 +9,87 @@
 import UIKit
 
 class ViewController: UIViewController {
-    let provider = JSDataProvider()
-    override func viewDidLoad() {
-        super.viewDidLoad()
-        // Do any additional setup after loading the view, typically from a nib.
-        let button = UIButton(type: .custom)
-        button.setTitle("Test", for: .normal)
-        button.setTitleColor(UIColor.black, for: .normal)
-        button.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(button)
-        button.centerXAnchor.constraint(equalTo: view.centerXAnchor).isActive = true
-        button.centerYAnchor.constraint(equalTo: view.centerYAnchor).isActive = true
-        button.widthAnchor.constraint(equalToConstant: 50).isActive = true
-        button.heightAnchor.constraint(equalToConstant: 50).isActive = true
-        
-        button.addTarget(self, action: #selector(doSomething), for: .touchUpInside)
-      
-      let secondButton = UIButton(type: .custom)
-      secondButton.setTitle("Video", for: .normal)
-      secondButton.setTitleColor(UIColor.green, for: .normal)
-      secondButton.translatesAutoresizingMaskIntoConstraints = false
-      
-      view.addSubview(secondButton)
-      secondButton.centerXAnchor.constraint(equalTo: view.centerXAnchor).isActive = true
-      secondButton.topAnchor.constraint(equalTo: button.bottomAnchor, constant: 10).isActive = true
-      secondButton.widthAnchor.constraint(equalToConstant: 50).isActive = true
-      secondButton.heightAnchor.constraint(equalToConstant: 50).isActive = true
-      
-      secondButton.addTarget(self, action: #selector(openVideoComposition), for: .touchUpInside)
-    }
-
-    @objc func doSomething() {
-        provider.start()
-        for i in 0..<30 {
-            provider.test(number: i)
-        }
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
-            print("+++++++++++ start new test after 4 seconds in main thread")
-            for i in 0..<10 {
-                self.provider.test(number: i)
-            }
-        }
-        
-        DispatchQueue.global().asyncAfter(deadline: .now() + 4) {
-            print("+++++++++++ start new test after 4 seconds in main background")
-            for i in 10..<20 {
-                self.provider.test(number: i)
-            }
-        }
-    }
+  let provider = JSDataProvider()
+  override func viewDidLoad() {
+    super.viewDidLoad()
+    // Do any additional setup after loading the view, typically from a nib.
+    let button = UIButton(type: .custom)
+    button.setTitle("Test", for: .normal)
+    button.setTitleColor(UIColor.black, for: .normal)
+    button.translatesAutoresizingMaskIntoConstraints = false
+    view.addSubview(button)
+    button.centerXAnchor.constraint(equalTo: view.centerXAnchor).isActive = true
+    button.centerYAnchor.constraint(equalTo: view.centerYAnchor).isActive = true
+    button.widthAnchor.constraint(equalToConstant: 50).isActive = true
+    button.heightAnchor.constraint(equalToConstant: 50).isActive = true
+    
+    button.addTarget(self, action: #selector(doSomething), for: .touchUpInside)
+    
+    let secondButton = UIButton(type: .custom)
+    secondButton.setTitle("Load", for: .normal)
+    secondButton.setTitleColor(UIColor.black, for: .normal)
+    secondButton.translatesAutoresizingMaskIntoConstraints = false
+    view.addSubview(secondButton)
+    secondButton.centerXAnchor.constraint(equalTo: view.centerXAnchor).isActive = true
+    secondButton.topAnchor.constraint(equalTo: button.bottomAnchor, constant: 10).isActive = true
+    secondButton.widthAnchor.constraint(equalToConstant: 50).isActive = true
+    secondButton.heightAnchor.constraint(equalToConstant: 50).isActive = true
+    secondButton.addTarget(self, action: #selector(load), for: .touchUpInside)
+    
+    let thirdButton = UIButton(type: .custom)
+    thirdButton.setTitle("Load Compiled", for: .normal)
+    thirdButton.setTitleColor(UIColor.black, for: .normal)
+    thirdButton.translatesAutoresizingMaskIntoConstraints = false
+    view.addSubview(thirdButton)
+    thirdButton.centerXAnchor.constraint(equalTo: view.centerXAnchor).isActive = true
+    thirdButton.topAnchor.constraint(equalTo: secondButton.bottomAnchor, constant: 10).isActive = true
+    thirdButton.widthAnchor.constraint(equalToConstant: 100).isActive = true
+    thirdButton.heightAnchor.constraint(equalToConstant: 50).isActive = true
+    thirdButton.addTarget(self, action: #selector(loadCompiled), for: .touchUpInside)
+    
+    let fourthButton = UIButton(type: .custom)
+    fourthButton.setTitle("Execute", for: .normal)
+    fourthButton.setTitleColor(UIColor.black, for: .normal)
+    fourthButton.translatesAutoresizingMaskIntoConstraints = false
+    view.addSubview(fourthButton)
+    fourthButton.centerXAnchor.constraint(equalTo: view.centerXAnchor).isActive = true
+    fourthButton.topAnchor.constraint(equalTo: thirdButton.bottomAnchor, constant: 10).isActive = true
+    fourthButton.widthAnchor.constraint(equalToConstant: 100).isActive = true
+    fourthButton.heightAnchor.constraint(equalToConstant: 50).isActive = true
+    fourthButton.addTarget(self, action: #selector(execute), for: .touchUpInside)
+    
+    let fifthButton = UIButton(type: .custom)
+    fifthButton.setTitle("Stop", for: .normal)
+    fifthButton.setTitleColor(UIColor.green, for: .normal)
+    fifthButton.translatesAutoresizingMaskIntoConstraints = false
+    view.addSubview(fifthButton)
+    fifthButton.centerXAnchor.constraint(equalTo: view.centerXAnchor).isActive = true
+    fifthButton.topAnchor.constraint(equalTo: fourthButton.bottomAnchor, constant: 10).isActive = true
+    fifthButton.widthAnchor.constraint(equalToConstant: 50).isActive = true
+    fifthButton.heightAnchor.constraint(equalToConstant: 50).isActive = true
+    fifthButton.addTarget(self, action: #selector(stop), for: .touchUpInside)
+  }
   
-  @objc func openVideoComposition() {
+  @objc func doSomething() {
+    provider.start()
+  }
+  
+  @objc func stop() {
     provider.stop()
+  }
+  
+  @objc func execute() {
+    provider.execute(script: "getData()")
+  }
+  
+  @objc func loadCompiled() {
+    let bundle = Bundle.main.url(forResource: "data-compiled", withExtension: "js")
+    provider.load(jsBundle: bundle!)
+  }
+  
+  @objc func load() {
+    let bundle = Bundle.main.url(forResource: "data", withExtension: "js")
+    provider.load(jsBundle: bundle!)
   }
 }
 

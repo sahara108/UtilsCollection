@@ -9,12 +9,17 @@
 import UIKit
 import JavaScriptCore
 
+protocol JSDataProviderOutput: class {
+  func execute(commandId: String, result: JSValue)
+}
+
 final class JSDataProvider {
   private typealias Job = ()->()
   private var thread: Thread?
   
   private var queue: [RunloopSource.RunloopSourceContext] = []
   
+  weak var output: JSDataProviderOutput?
   public init() {
   }
   
@@ -38,16 +43,31 @@ final class JSDataProvider {
     }
   }
   
-  private func execute(_ job: @escaping Job) throws {
-  }
-  
   private var pendingTask = [Int]()
   public func test(number: Int) {
     guard queue.count > 0 else {
       return
     }
     let sourceInfo = queue[0]
-    sourceInfo.source.addCommand(number)
+    sourceInfo.source.addCommand(RunloopSource.Command.log(value: "\(number)"))
+    sourceInfo.source.fireCommandsOnRunLoop(runloop: sourceInfo.runloop)
+  }
+  
+  public func load(jsBundle: URL) {
+    guard queue.count > 0 else {
+      return
+    }
+    let sourceInfo = queue[0]
+    sourceInfo.source.addCommand(RunloopSource.Command.load(fileURL: jsBundle))
+    sourceInfo.source.fireCommandsOnRunLoop(runloop: sourceInfo.runloop)
+  }
+  
+  public func execute(script: String) {
+    guard queue.count > 0 else {
+      return
+    }
+    let sourceInfo = queue[0]
+    sourceInfo.source.addCommand(RunloopSource.Command.execute(script: script))
     sourceInfo.source.fireCommandsOnRunLoop(runloop: sourceInfo.runloop)
   }
   
@@ -59,6 +79,10 @@ final class JSDataProvider {
     if let index = queue.firstIndex(where: {$0.source === sourceInfo.source}) {
       queue.remove(at: index)
     }
+  }
+  
+  fileprivate func notifyResult(_ result: JSValue?) {
+    print("Get result: \(result)")
   }
   
   //MARK: - main
@@ -97,10 +121,16 @@ private class RunloopSource: NSObject {
     }
   }
   
+  enum Command {
+    case log(value: String)
+    case load(fileURL: URL)
+    case execute(script: String)
+  }
+  
   private let commandQueue = DispatchQueue(label: "runloopSourceCommandQueue")
   private let commandQueueKey = DispatchSpecificKey<Void>()
-  private var data: [Any] = []
-  public func addCommand(_ command: Any) {
+  private var data: [Command] = []
+  public func addCommand(_ command: Command) {
     if DispatchQueue.getSpecific(key: commandQueueKey) == nil {
       commandQueue.async { [weak self] in
         self?.data.append(command)
@@ -110,8 +140,8 @@ private class RunloopSource: NSObject {
     }
   }
   
-  private func poll() -> Any? {
-    var result: Any? = nil
+  private func poll() -> Command? {
+    var result: Command? = nil
     if DispatchQueue.getSpecific(key: commandQueueKey) == nil {
       commandQueue.sync { [weak self] in
         guard let this = self else { return }
@@ -185,7 +215,7 @@ private class RunloopSource: NSObject {
     CFRunLoopStop(runloop)
   }
   
-  func sourceFired() {
+  private func sourceFired() {
     if let command = poll() {
       executeCommand(command: command)
       
@@ -194,8 +224,40 @@ private class RunloopSource: NSObject {
     }
   }
   
-  func executeCommand(command: Any) {
+  private func executeCommand(command: Command) {
     print("start working on thread: \(Thread.current) with data: \(String(describing: command))")
+    switch command {
+    case .load(let file):
+      load(jsFile: file)
+    case .execute(let script):
+      execute(js: script)
+    case .log(let value):
+      log(value: value)
+    }
+  }
+  
+  private var virtualMachine: JSVirtualMachine?
+  private var jsContext: JSContext?
+  private func load(jsFile: URL) {
+    guard let data = try? Data(contentsOf: jsFile, options: .init(rawValue: 0)) else { return }
+    if virtualMachine == nil {
+      virtualMachine = JSVirtualMachine()
+    }
+    jsContext = JSContext(virtualMachine: virtualMachine!)
+    _ = jsContext?.evaluateScript(String(data: data, encoding: .utf8) ?? "")
+  }
+  
+  private func execute(js: String) {
+    if let context = jsContext {
+      let result = context.evaluateScript(js)
+      DispatchQueue.main.async { [weak self] in
+        self?.provider?.notifyResult(result)
+      }
+    }
+  }
+  
+  private func log(value: String) {
+    print("Thread \(Thread.current) print: \(value)")
   }
 }
 
