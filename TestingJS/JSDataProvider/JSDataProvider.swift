@@ -150,7 +150,9 @@ private class RunloopSource: NSObject {
         }
       }
     } else {
-      result = data.removeFirst()
+      if data.count > 0 {
+        result = data.removeFirst()
+      }
     }
     return result
   }

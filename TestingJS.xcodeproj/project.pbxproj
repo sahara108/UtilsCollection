@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		7139CA2B21A2656C00173FF9 /* SWRecordVideoViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7139CA2A21A2656C00173FF9 /* SWRecordVideoViewController.swift */; };
+		7139CA2F21A2C24E00173FF9 /* sample.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 7139CA2E21A2C24E00173FF9 /* sample.mp3 */; };
 		71DF1640219D788F00EFE2FB /* data-compiled.js in Resources */ = {isa = PBXBuildFile; fileRef = 71DF163E219D788F00EFE2FB /* data-compiled.js */; };
 		71DF1641219D788F00EFE2FB /* data.js in Resources */ = {isa = PBXBuildFile; fileRef = 71DF163F219D788F00EFE2FB /* data.js */; };
 		ABC50CA52197F300002A889B /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABC50CA42197F300002A889B /* AppDelegate.swift */; };
@@ -37,6 +39,8 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		7139CA2A21A2656C00173FF9 /* SWRecordVideoViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SWRecordVideoViewController.swift; sourceTree = "<group>"; };
+		7139CA2E21A2C24E00173FF9 /* sample.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = sample.mp3; sourceTree = "<group>"; };
 		71DF163E219D788F00EFE2FB /* data-compiled.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = "data-compiled.js"; sourceTree = "<group>"; };
 		71DF163F219D788F00EFE2FB /* data.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = data.js; sourceTree = "<group>"; };
 		ABC50CA12197F300002A889B /* TestingJS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TestingJS.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -80,6 +84,14 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		7139CA2921A260AA00173FF9 /* New Group */ = {
+			isa = PBXGroup;
+			children = (
+				7139CA2A21A2656C00173FF9 /* SWRecordVideoViewController.swift */,
+			);
+			path = "New Group";
+			sourceTree = "<group>";
+		};
 		ABC50C982197F2FF002A889B = {
 			isa = PBXGroup;
 			children = (
@@ -103,6 +115,7 @@
 		ABC50CA32197F300002A889B /* TestingJS */ = {
 			isa = PBXGroup;
 			children = (
+				7139CA2921A260AA00173FF9 /* New Group */,
 				ABC50CD22197F39E002A889B /* JSDataProvider */,
 				ABC50CA42197F300002A889B /* AppDelegate.swift */,
 				ABC50CA62197F300002A889B /* ViewController.swift */,
@@ -110,6 +123,7 @@
 				ABC50CAB2197F305002A889B /* Assets.xcassets */,
 				ABC50CAD2197F305002A889B /* LaunchScreen.storyboard */,
 				ABC50CB02197F305002A889B /* Info.plist */,
+				7139CA2E21A2C24E00173FF9 /* sample.mp3 */,
 				71DF163E219D788F00EFE2FB /* data-compiled.js */,
 				71DF163F219D788F00EFE2FB /* data.js */,
 			);
@@ -248,6 +262,7 @@
 			files = (
 				ABC50CAF2197F305002A889B /* LaunchScreen.storyboard in Resources */,
 				ABC50CAC2197F305002A889B /* Assets.xcassets in Resources */,
+				7139CA2F21A2C24E00173FF9 /* sample.mp3 in Resources */,
 				ABC50CAA2197F300002A889B /* Main.storyboard in Resources */,
 				71DF1641219D788F00EFE2FB /* data.js in Resources */,
 				71DF1640219D788F00EFE2FB /* data-compiled.js in Resources */,
@@ -276,6 +291,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				ABC50CD42197F3B3002A889B /* JSDataProvider.swift in Sources */,
+				7139CA2B21A2656C00173FF9 /* SWRecordVideoViewController.swift in Sources */,
 				ABC50CA72197F300002A889B /* ViewController.swift in Sources */,
 				ABC50CA52197F300002A889B /* AppDelegate.swift in Sources */,
 			);
@@ -453,8 +469,9 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = D9446NZ8V3;
+				DEVELOPMENT_TEAM = WL8MAW746U;
 				INFOPLIST_FILE = TestingJS/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 10.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -471,8 +488,9 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = D9446NZ8V3;
+				DEVELOPMENT_TEAM = WL8MAW746U;
 				INFOPLIST_FILE = TestingJS/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 10.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",

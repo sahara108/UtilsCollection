@@ -7,6 +7,7 @@
 //
 
 import UIKit
+import AVKit
 
 class ViewController: UIViewController {
   let provider = JSDataProvider()
@@ -19,7 +20,7 @@ class ViewController: UIViewController {
     button.translatesAutoresizingMaskIntoConstraints = false
     view.addSubview(button)
     button.centerXAnchor.constraint(equalTo: view.centerXAnchor).isActive = true
-    button.centerYAnchor.constraint(equalTo: view.centerYAnchor).isActive = true
+    button.centerYAnchor.constraint(equalTo: view.centerYAnchor, constant: -50).isActive = true
     button.widthAnchor.constraint(equalToConstant: 50).isActive = true
     button.heightAnchor.constraint(equalToConstant: 50).isActive = true
     
@@ -43,7 +44,7 @@ class ViewController: UIViewController {
     view.addSubview(thirdButton)
     thirdButton.centerXAnchor.constraint(equalTo: view.centerXAnchor).isActive = true
     thirdButton.topAnchor.constraint(equalTo: secondButton.bottomAnchor, constant: 10).isActive = true
-    thirdButton.widthAnchor.constraint(equalToConstant: 100).isActive = true
+    thirdButton.widthAnchor.constraint(equalToConstant: 150).isActive = true
     thirdButton.heightAnchor.constraint(equalToConstant: 50).isActive = true
     thirdButton.addTarget(self, action: #selector(loadCompiled), for: .touchUpInside)
     
@@ -68,6 +69,33 @@ class ViewController: UIViewController {
     fifthButton.widthAnchor.constraint(equalToConstant: 50).isActive = true
     fifthButton.heightAnchor.constraint(equalToConstant: 50).isActive = true
     fifthButton.addTarget(self, action: #selector(stop), for: .touchUpInside)
+    
+    let cameraButton = UIButton(type: .custom)
+    cameraButton.setTitle("Camera", for: .normal)
+    cameraButton.setTitleColor(UIColor.blue, for: .normal)
+    cameraButton.translatesAutoresizingMaskIntoConstraints = false
+    view.addSubview(cameraButton)
+    cameraButton.centerXAnchor.constraint(equalTo: view.centerXAnchor).isActive = true
+    cameraButton.topAnchor.constraint(equalTo: fifthButton.bottomAnchor, constant: 10).isActive = true
+    cameraButton.widthAnchor.constraint(equalToConstant: 75).isActive = true
+    cameraButton.heightAnchor.constraint(equalToConstant: 50).isActive = true
+    cameraButton.addTarget(self, action: #selector(ViewController.camera), for: .touchUpInside)
+    
+    let playButton = UIButton(type: .custom)
+    playButton.setTitle("Play", for: .normal)
+    playButton.setTitleColor(UIColor.blue, for: .normal)
+    playButton.translatesAutoresizingMaskIntoConstraints = false
+    view.addSubview(playButton)
+    playButton.centerXAnchor.constraint(equalTo: view.centerXAnchor).isActive = true
+    playButton.topAnchor.constraint(equalTo: cameraButton.bottomAnchor, constant: 10).isActive = true
+    playButton.widthAnchor.constraint(equalToConstant: 75).isActive = true
+    playButton.heightAnchor.constraint(equalToConstant: 50).isActive = true
+    playButton.addTarget(self, action: #selector(ViewController.play), for: .touchUpInside)
+  }
+  
+  @objc func camera() {
+    let vc = SWRecordVideoViewController()
+    present(vc, animated: true, completion: nil)
   }
   
   @objc func doSomething() {
@@ -90,6 +118,17 @@ class ViewController: UIViewController {
   @objc func load() {
     let bundle = Bundle.main.url(forResource: "data", withExtension: "js")
     provider.load(jsBundle: bundle!)
+  }
+  
+  @objc func play() {
+    let tempDir = NSTemporaryDirectory()
+    let tempDirURL = URL(fileURLWithPath: tempDir)
+    let videoURL = tempDirURL.appendingPathComponent("recordedVideo")
+    let playbackViewController = AVPlayerViewController()
+    playbackViewController.player = AVPlayer(url: videoURL)
+    present(playbackViewController, animated: true) {
+      playbackViewController.player?.play()
+    }
   }
 }
 
