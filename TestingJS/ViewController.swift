@@ -120,15 +120,20 @@ class ViewController: UIViewController {
     provider.load(jsBundle: bundle!)
   }
   
-  @objc func play() {
-    let tempDir = NSTemporaryDirectory()
-    let tempDirURL = URL(fileURLWithPath: tempDir)
-    let videoURL = tempDirURL.appendingPathComponent("recordedVideo")
+  @objc func play() { 
+    let videoURL = tempRecordVideoURL()
     let playbackViewController = AVPlayerViewController()
-    playbackViewController.player = AVPlayer(url: videoURL)
+    playbackViewController.player = AVPlayer(url: videoURL as URL)
     present(playbackViewController, animated: true) {
       playbackViewController.player?.play()
     }
   }
+}
+
+func tempRecordVideoURL() -> URL {
+  let tempDir = NSTemporaryDirectory()
+  let tempDirURL = URL(fileURLWithPath: tempDir)
+  let videoURL = tempDirURL.appendingPathComponent("someVideo.mp4")
+  return videoURL
 }
 

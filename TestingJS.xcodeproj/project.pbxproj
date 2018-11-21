@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		7139CA2B21A2656C00173FF9 /* SWRecordVideoViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7139CA2A21A2656C00173FF9 /* SWRecordVideoViewController.swift */; };
 		7139CA2F21A2C24E00173FF9 /* sample.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 7139CA2E21A2C24E00173FF9 /* sample.mp3 */; };
+		7139CA3321A4173700173FF9 /* SWRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7139CA3221A4173700173FF9 /* SWRecorder.swift */; };
 		71DF1640219D788F00EFE2FB /* data-compiled.js in Resources */ = {isa = PBXBuildFile; fileRef = 71DF163E219D788F00EFE2FB /* data-compiled.js */; };
 		71DF1641219D788F00EFE2FB /* data.js in Resources */ = {isa = PBXBuildFile; fileRef = 71DF163F219D788F00EFE2FB /* data.js */; };
 		ABC50CA52197F300002A889B /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABC50CA42197F300002A889B /* AppDelegate.swift */; };
@@ -41,6 +42,7 @@
 /* Begin PBXFileReference section */
 		7139CA2A21A2656C00173FF9 /* SWRecordVideoViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SWRecordVideoViewController.swift; sourceTree = "<group>"; };
 		7139CA2E21A2C24E00173FF9 /* sample.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = sample.mp3; sourceTree = "<group>"; };
+		7139CA3221A4173700173FF9 /* SWRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SWRecorder.swift; sourceTree = "<group>"; };
 		71DF163E219D788F00EFE2FB /* data-compiled.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = "data-compiled.js"; sourceTree = "<group>"; };
 		71DF163F219D788F00EFE2FB /* data.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = data.js; sourceTree = "<group>"; };
 		ABC50CA12197F300002A889B /* TestingJS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TestingJS.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -88,6 +90,7 @@
 			isa = PBXGroup;
 			children = (
 				7139CA2A21A2656C00173FF9 /* SWRecordVideoViewController.swift */,
+				7139CA3221A4173700173FF9 /* SWRecorder.swift */,
 			);
 			path = "New Group";
 			sourceTree = "<group>";
@@ -290,6 +293,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				7139CA3321A4173700173FF9 /* SWRecorder.swift in Sources */,
 				ABC50CD42197F3B3002A889B /* JSDataProvider.swift in Sources */,
 				7139CA2B21A2656C00173FF9 /* SWRecordVideoViewController.swift in Sources */,
 				ABC50CA72197F300002A889B /* ViewController.swift in Sources */,
