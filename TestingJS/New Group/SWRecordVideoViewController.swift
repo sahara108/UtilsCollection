@@ -168,6 +168,8 @@ class SWRecordVideoViewController: UIViewController {
   
   private var setupResult: SessionSetupResult = .success
   private var currentDeviceInput: AVCaptureDeviceInput?
+  private var videoCaptureOutput: AVCaptureVideoDataOutput?
+  private var audioCaptureOutput: AVCaptureAudioDataOutput?
   private func setupAudioSession() {
     do {
       try AVAudioSession.sharedInstance().setCategory(.playAndRecord, mode: .videoRecording, options: .defaultToSpeaker)
@@ -194,10 +196,10 @@ class SWRecordVideoViewController: UIViewController {
         captureSession?.canAddOutput(audioOutput) == true {
         captureSession?.addInput(input)
         captureSession?.addOutput(videoOutput)
-        captureSession?.canAddOutput(audioOutput)
+        captureSession?.addOutput(audioOutput)
 
-        videoOutput.setSampleBufferDelegate(self, queue: recorder.writingVideoQueue)
-        audioOutput.setSampleBufferDelegate(self, queue: recorder.writingVideoQueue)
+        videoOutput.setSampleBufferDelegate(self, queue: DispatchQueue.global())
+        audioOutput.setSampleBufferDelegate(self, queue: DispatchQueue.global())
         DispatchQueue.main.async {
           self.setupVideoPreviewLayer()
         }
@@ -206,6 +208,8 @@ class SWRecordVideoViewController: UIViewController {
         captureSession?.startRunning()
         isCameraPermissionGranted = true
         currentDeviceInput = input
+        videoCaptureOutput = videoOutput
+        audioCaptureOutput = audioOutput
       } else {
         setupResult = .configurationFailed
         captureSession?.commitConfiguration()
@@ -363,16 +367,18 @@ extension SWRecordVideoViewController {
 
 extension SWRecordVideoViewController: AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureAudioDataOutputSampleBufferDelegate {
   func captureOutput(_ output: AVCaptureOutput, didDrop sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
-    
+    var mode: CMAttachmentMode = 0
+    let reason = CMGetAttachment(sampleBuffer, key: kCMSampleBufferAttachmentKey_DroppedFrameReason, attachmentModeOut: &mode)
+    print("reason \(String(describing: reason))") // Optional(OutOfBuffers)
   }
   
   func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
     guard CMSampleBufferIsValid(sampleBuffer), CMSampleBufferDataIsReady(sampleBuffer) else {
       return
     }
-    if output.isKind(of: AVCaptureVideoDataOutput.self) {
+    if output == videoCaptureOutput {
       recorder.writeVideoBuffer(sampleBuffer)
-    } else if output.isKind(of: AVCaptureAudioDataOutput.self) {
+    } else if output == audioCaptureOutput {
       recorder.writeAudioBuffer(sampleBuffer)
     }
   }

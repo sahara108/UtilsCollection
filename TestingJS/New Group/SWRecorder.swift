@@ -107,8 +107,8 @@ final class SWRecorder: NSObject {
     executeWritingVideoJob { [weak self] in
       guard let this = self else { return }
       this.acceptIncomingBuffer = false
-      this.lastPauseTime = this.lastSampleTime
-      this.lastDiff = nil
+      this.videoLastTimingInfo?.save()
+      this.audioLastTimingInfo?.save()
     }
   }
   
@@ -118,7 +118,7 @@ final class SWRecorder: NSObject {
       
       this.videoWriterInput?.markAsFinished()
       this.audioWriterInput?.markAsFinished()
-      this.assetWriter?.endSession(atSourceTime: this.lastSampleTime ?? CMTime.zero)
+      this.assetWriter?.endSession(atSourceTime: this.videoLastTimingInfo?.last ?? CMTime.zero)
       this.assetWriter?.finishWriting { [weak this] in
         this?.didFinishRecordingVideo()
       }
@@ -133,34 +133,49 @@ final class SWRecorder: NSObject {
     self.audioWriterInput = nil
     self.assetWriter = nil
     self.acceptIncomingBuffer = false
-    self.lastSampleTime = nil
-    self.lastDiff = nil
-    self.lastPauseTime = nil
+    self.videoLastTimingInfo = nil
+    self.audioLastTimingInfo = nil
   }
   
-  private var lastSampleTime: CMTime?
-  private var lastDiff: CMTime?
-  private var lastPauseTime: CMTime?
+  private class SaveStateTimingInfo {
+    var last: CMTime?
+    var oldDiff: CMTime?
+    var diff: CMTime?
+    var pause: CMTime?
+    
+    func reset() {
+      last = nil
+      diff = nil
+      pause = nil
+      oldDiff = nil
+    }
+    
+    func save() {
+      pause = last
+      oldDiff = diff
+      diff = nil
+    }
+  }
+  private var videoLastTimingInfo: SaveStateTimingInfo?
+  private var audioLastTimingInfo: SaveStateTimingInfo?
   func writeVideoBuffer(_ buffer: CMSampleBuffer) {
     guard acceptIncomingBuffer else {
       return
     }
     executeWritingVideoJob { [weak self] in
       guard let this = self else { return }
-      
+      let bufferTimestamp = CMSampleBufferGetPresentationTimeStamp(buffer)
       if this.assetWriter?.status == .unknown {
         this.assetWriter?.startWriting()
-        let bufferTimestamp = CMSampleBufferGetPresentationTimeStamp(buffer)
         this.assetWriter?.startSession(atSourceTime: bufferTimestamp)
-      } else if this.assetWriter?.status == .writing, this.videoWriterInput?.isReadyForMoreMediaData == true,
-        let outBuffer = this.processBuffer(buffer) {
-        let success = this.videoWriterInput?.append(outBuffer)
-        if success == false {
-          let status = this.assetWriter?.status
-          print("Current assetwriter status: \(status?.rawValue)")
-          let error = this.assetWriter?.error
-          print("what is this: \(String(describing: error))")
-        }
+        //create last info for video and audio buffer
+        this.videoLastTimingInfo = SaveStateTimingInfo()
+        this.audioLastTimingInfo = SaveStateTimingInfo()
+      } else if this.assetWriter?.status == .writing, this.videoWriterInput?.isReadyForMoreMediaData == true, let outBuffer = this.processBuffer(buffer, timingInfo: this.videoLastTimingInfo) {
+        autoreleasepool(invoking: { () -> () in
+          this.videoWriterInput?.append(outBuffer)
+        })
+        this.videoLastTimingInfo?.last = bufferTimestamp
       } else {
         let error = this.assetWriter?.error
         print("what is this: \(String(describing: error))")
@@ -168,40 +183,41 @@ final class SWRecorder: NSObject {
     }
   }
   
-  private func processBuffer(_ buffer: CMSampleBuffer) -> CMSampleBuffer? {
+  func writeAudioBuffer(_ buffer: CMSampleBuffer) {
+      guard acceptIncomingBuffer else { return }
+      executeWritingVideoJob { [weak self] in
+        guard let this = self else { return }
+        let bufferTimestamp = CMSampleBufferGetPresentationTimeStamp(buffer)
+        if this.assetWriter?.status == .writing, this.audioWriterInput?.isReadyForMoreMediaData == true, let outbuffer = this.processBuffer(buffer, timingInfo: this.audioLastTimingInfo) {
+          this.audioWriterInput?.append(outbuffer)
+        }
+        this.audioLastTimingInfo?.last = bufferTimestamp
+      }
+  }
+  
+  private func processBuffer(_ buffer: CMSampleBuffer, timingInfo info: SaveStateTimingInfo?) -> CMSampleBuffer? {
     let bufferTimestamp = CMSampleBufferGetPresentationTimeStamp(buffer)
-    self.lastSampleTime = bufferTimestamp
-    if let lastPauseTime = self.lastPauseTime, self.lastDiff == nil {
-      self.lastDiff = bufferTimestamp - lastPauseTime
+    if let lastPauseTime = info?.pause, info?.diff == nil {
+      info?.diff = bufferTimestamp - lastPauseTime + (info?.oldDiff ?? CMTime.zero)
     }
 
-    if let diff = self.lastDiff {
-      let newTimestamp = bufferTimestamp - diff
-      print("input timestamp: \(bufferTimestamp) output timestamp \(newTimestamp)")
+    if let diff = info?.diff, CMTimeGetSeconds(diff) > 0 {
+      let newTimestamp = bufferTimestamp - diff + CMTime(seconds: 1.0/30, preferredTimescale: bufferTimestamp.timescale)
 
       var count: CMItemCount = 0
       CMSampleBufferGetSampleTimingInfoArray(buffer, entryCount: 0, arrayToFill: nil, entriesNeededOut: &count);
-      let pInfo: UnsafeMutablePointer<CMSampleTimingInfo> = UnsafeMutablePointer<CMSampleTimingInfo>.allocate(capacity: 1)
-      CMSampleBufferGetSampleTimingInfoArray(buffer, entryCount: count, arrayToFill: pInfo, entriesNeededOut: &count)
-      for i in 0..<count {
-        pInfo[i].decodeTimeStamp = newTimestamp; // kCMTimeInvalid if in sequence
-        pInfo[i].presentationTimeStamp = newTimestamp;
+      var pInfo = CMSampleTimingInfo.invalid
+      CMSampleBufferGetSampleTimingInfoArray(buffer, entryCount: count, arrayToFill: &pInfo, entriesNeededOut: &count)
+      for _ in 0..<count {
+        pInfo.decodeTimeStamp = newTimestamp; // kCMTimeInvalid if in sequence
+        pInfo.presentationTimeStamp = newTimestamp;
       }
-      let sout: UnsafeMutablePointer<CMSampleBuffer?> = UnsafeMutablePointer<CMSampleBuffer?>.allocate(capacity: 1)
-      CMSampleBufferCreateCopyWithNewTiming(allocator: kCFAllocatorDefault, sampleBuffer: buffer, sampleTimingEntryCount: count, sampleTimingArray: pInfo, sampleBufferOut: sout)
-      return sout.pointee
+      var sout: CMSampleBuffer? = nil
+      CMSampleBufferCreateCopyWithNewTiming(allocator: kCFAllocatorMalloc, sampleBuffer: buffer, sampleTimingEntryCount: count, sampleTimingArray: &pInfo, sampleBufferOut: &sout)
+
+      return sout
     } else {
       return buffer
-    }
-  }
-  
-  func writeAudioBuffer(_ buffer: CMSampleBuffer) {
-    guard acceptIncomingBuffer else { return }
-    executeWritingVideoJob { [weak self] in
-      guard let this = self else { return }
-      if this.assetWriter?.status == .writing, this.audioWriterInput?.isReadyForMoreMediaData == true, let outbuffer = this.processBuffer(buffer) {
-        this.audioWriterInput?.append(outbuffer)
-      }
     }
   }
   
