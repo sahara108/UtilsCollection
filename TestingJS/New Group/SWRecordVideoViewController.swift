@@ -22,7 +22,16 @@ class SWRecordVideoViewController: UIViewController {
   private var capturedDevice: AVCaptureDevice?
   private var videoPreviewLayer: AVCaptureVideoPreviewLayer?
   private var didAskCameraPermission: Bool = false
-  private var isCameraPermissionGranted: Bool = false
+  private var isCameraPermissionGranted: Bool = false {
+    didSet {
+      startIfPossible()
+    }
+  }
+  private var isMicrophonePermissionGranted: Bool = false {
+    didSet {
+      startIfPossible()
+    }
+  }
   
   //Controls
   private lazy var backButton: UIButton = {
@@ -65,12 +74,7 @@ class SWRecordVideoViewController: UIViewController {
   
   override public func viewDidAppear(_ animated: Bool) {
     super.viewDidAppear(animated)
-    if !didAskCameraPermission {
-      checkCameraPermissionAndShowOnboardingIfNeeded()
-      didAskCameraPermission = true
-    } else if isCameraPermissionGranted {
-      stopSession()
-    }
+    checkPermissionAndShowOnboardingIfNeeded()
     view.bringSubviewToFront(backButton)
   }
   
@@ -179,22 +183,27 @@ class SWRecordVideoViewController: UIViewController {
   }
   
   private func setupCameraSession() {
-    guard let captureDevice = getDevice(position: .front), setupResult == .success
+    guard let captureDevice = getDevice(position: .front),
+      let microphoneDevice = AVCaptureDevice.default(for: .audio),
+      setupResult == .success
       else {
         return
     }
     capturedDevice = captureDevice
     do {
       let input = try AVCaptureDeviceInput(device: captureDevice)
+      let audioDeviceInput = try AVCaptureDeviceInput(device: microphoneDevice)
       let videoOutput = AVCaptureVideoDataOutput()
       videoOutput.videoSettings = [kCVPixelBufferPixelFormatTypeKey: kCVPixelFormatType_32BGRA] as [String: Any]
       let audioOutput = AVCaptureAudioDataOutput()
       captureSession?.beginConfiguration()
       captureSession?.sessionPreset = AVCaptureSession.Preset.hd1280x720
       if captureSession?.canAddInput(input) == true,
+        captureSession?.canAddInput(audioDeviceInput) == true,
         captureSession?.canAddOutput(videoOutput) == true,
         captureSession?.canAddOutput(audioOutput) == true {
         captureSession?.addInput(input)
+        captureSession?.addInput(audioDeviceInput)
         captureSession?.addOutput(videoOutput)
         captureSession?.addOutput(audioOutput)
 
@@ -206,7 +215,6 @@ class SWRecordVideoViewController: UIViewController {
         
         captureSession?.commitConfiguration()
         captureSession?.startRunning()
-        isCameraPermissionGranted = true
         currentDeviceInput = input
         videoCaptureOutput = videoOutput
         audioCaptureOutput = audioOutput
@@ -326,32 +334,53 @@ class SWRecordVideoViewController: UIViewController {
   }
   
   // MARK: - Permission
-  private func checkCameraPermissionAndShowOnboardingIfNeeded() {
-    let authStatus = AVCaptureDevice.authorizationStatus(for: AVMediaType.video)
-    switch authStatus {
-    case .authorized:
-      sessionQueue.async { [weak self] in
-        self?.setupCameraSession()
+  fileprivate struct PermissionError: OptionSet {
+    let rawValue: Int
+    static let camera = PermissionError(rawValue: 1 << 0)
+    static let microphone = PermissionError(rawValue: 1 << 1)
+  }
+  private func checkPermissionAndShowOnboardingIfNeeded() {
+    let videoStatus = AVCaptureDevice.authorizationStatus(for: AVMediaType.video)
+    let audioStatus = AVCaptureDevice.authorizationStatus(for: .audio)
+    isMicrophonePermissionGranted = audioStatus == .authorized
+    isCameraPermissionGranted = videoStatus == .authorized
+    if (videoStatus == .restricted || videoStatus == .denied) {
+      handlePermissionError(.camera)
+    } else if (audioStatus == .restricted || audioStatus == .denied) {
+      handlePermissionError(.microphone)
+    } else {
+      //request permission and continue
+      if videoStatus == .notDetermined {
+        requestPermissionAndShowOnboardingIfNeeded(type: .video)
       }
-    case .notDetermined:
-      requestCameraPermissionAndShowOnboardingIfNeeded()
-    case .restricted, .denied:
-      handleError()
+      if audioStatus == .notDetermined {
+        requestPermissionAndShowOnboardingIfNeeded(type: .audio)
+      }
     }
   }
   
-  private func requestCameraPermissionAndShowOnboardingIfNeeded() {
-    AVCaptureDevice.requestAccess(for: AVMediaType.video, completionHandler: { granted in
+  private func requestPermissionAndShowOnboardingIfNeeded(type: AVMediaType) {
+    AVCaptureDevice.requestAccess(for: type, completionHandler: { granted in
       DispatchQueue.main.async { [weak self] in
         if granted {
-          self?.sessionQueue.async {
-            self?.setupCameraSession()
+          if type == .video {
+            self?.isCameraPermissionGranted = true
+          } else if type == .audio {
+            self?.isMicrophonePermissionGranted = true
           }
         } else {
-          self?.handleError()
+          self?.handlePermissionError(.camera)
         }
       }
     })
+  }
+  
+  private func startIfPossible() {
+    if isCameraPermissionGranted && isMicrophonePermissionGranted {
+      sessionQueue.async { [weak self] in
+        self?.setupCameraSession()
+      }
+    }
   }
 }
 
@@ -360,7 +389,7 @@ extension SWRecordVideoViewController {
   fileprivate func handleUnableSetupCamera(_ error: Error?) {
   }
   
-  fileprivate func handleError(error: Error? = nil) {
+  fileprivate func handlePermissionError(_ error: PermissionError) {
     
   }
 }
