@@ -8,6 +8,7 @@
 
 import UIKit
 import AVKit
+import Photos
 
 class ViewController: UIViewController {
   let provider = JSDataProvider()
@@ -120,8 +121,19 @@ class ViewController: UIViewController {
     provider.load(jsBundle: bundle!)
   }
   
-  @objc func play() { 
+  @objc func play() {
     let videoURL = tempRecordVideoURL()
+    PHPhotoLibrary.shared().performChanges({
+      PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: videoURL)
+    }) { saved, error in
+      if saved {
+        let alertController = UIAlertController(title: "Your video was successfully saved", message: nil, preferredStyle: .alert)
+        let defaultAction = UIAlertAction(title: "OK", style: .default, handler: nil)
+        alertController.addAction(defaultAction)
+        self.present(alertController, animated: true, completion: nil)
+      }
+    }
+    
     let playbackViewController = AVPlayerViewController()
     playbackViewController.player = AVPlayer(url: videoURL as URL)
     present(playbackViewController, animated: true) {

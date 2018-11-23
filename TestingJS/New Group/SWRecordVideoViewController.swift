@@ -122,7 +122,6 @@ class SWRecordVideoViewController: UIViewController {
     switch longPressGesture.state {
     case .began:
       beginTouchRecord()
-      try? recorder.beginWriting()
     case .cancelled, .ended:
       endTouchRecord()
     default:
@@ -131,11 +130,20 @@ class SWRecordVideoViewController: UIViewController {
   }
   
   @objc func beginTouchRecord() {
-    try? recorder.prepare()
+    do {
+      try recorder.prepare()
+      try recorder.beginWriting()
+    } catch _ {
+      //TODO: something went wrong, show alert
+    }
   }
   
   @objc func endTouchRecord() {
-    try? recorder.pauseWriting()
+    do {
+      try recorder.pauseWriting()
+    } catch {
+      
+    }
   }
   
   @objc func didTouchRecordButton() {
@@ -326,10 +334,7 @@ class SWRecordVideoViewController: UIViewController {
       output = AVCaptureDevice.default(.builtInWideAngleCamera,
                               for: .video, position: position)
     }
-//    try? output?.lockForConfiguration()
-//    output?.activeVideoMaxFrameDuration = output?.formats.first?.videoSupportedFrameRateRanges.min
-//    output?.activeVideoMinFrameDuration = CMTime(seconds: 1, preferredTimescale: 30)
-//    output?.unlockForConfiguration()
+
     return output
   }
   
@@ -410,6 +415,16 @@ extension SWRecordVideoViewController: AVCaptureVideoDataOutputSampleBufferDeleg
     } else if output == audioCaptureOutput {
       recorder.writeAudioBuffer(sampleBuffer)
     }
+  }
+}
+
+extension SWRecordVideoViewController: SWRecorderOutput {
+  func recorderReadyForCollection() {
+    
+  }
+  
+  func recorderDidFinish(withFile fileUrl: URL) {
+    
   }
 }
 

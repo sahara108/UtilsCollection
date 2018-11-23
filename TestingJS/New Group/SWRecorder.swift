@@ -9,7 +9,8 @@
 import AVFoundation
 
 protocol SWRecorderOutput: class {
-  func recorderFail(withError error: SWRecorderError)
+  func recorderReadyForCollection()
+  func recorderDidFinish(withFile fileUrl: URL)
 }
 
 enum SWRecorderError: Error {
@@ -22,18 +23,25 @@ enum SWRecorderError: Error {
 
 final class SWRecorder: NSObject {
   let writingVideoQueue = OS_dispatch_queue_serial(label: "Recorder Queue")
-  
+  let writingVideoSpecificKey = DispatchSpecificKey<String>()
   weak var output: SWRecorderOutput?
   var isRunning = false
+  var minimumDurationAllowed = 5.0
+  var maximumDurationAllowed = 60.0
   
   override init() {
     super.init()
 
+    writingVideoQueue.setSpecific(key: writingVideoSpecificKey, value: self.description)
   }
   
   private func executeWritingVideoJob(_ job: @escaping ()->()) {
-    writingVideoQueue.async {
+    if DispatchQueue.getSpecific(key: writingVideoSpecificKey) == self.description {
       job()
+    } else {
+      writingVideoQueue.async {
+        job()
+      }
     }
   }
   
@@ -41,6 +49,7 @@ final class SWRecorder: NSObject {
   fileprivate var assetWriter: AVAssetWriter?
   fileprivate var videoWriterInput: AVAssetWriterInput?
   fileprivate var audioWriterInput: AVAssetWriterInput?
+  fileprivate var workingFileURL: URL = tempRecordVideoURL()
   func prepare() throws {
     guard assetWriter == nil, !isRunning else {
       throw SWRecorderError.otherWritterIsRunning
@@ -49,9 +58,11 @@ final class SWRecorder: NSObject {
     //first reset all variables
     reset()
     
+    //we only allow 1 record 1 video at a time
+    
     do {
-      try? FileManager.default.removeItem(at: tempRecordVideoURL())
-      let writer = try AVAssetWriter(outputURL: tempRecordVideoURL(), fileType: .mov)
+      try? FileManager.default.removeItem(at: workingFileURL)
+      let writer = try AVAssetWriter(outputURL: workingFileURL, fileType: .mov)
       writer.shouldOptimizeForNetworkUse = true
       let videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: [AVVideoCodecKey: AVVideoCodecH264,
                                                                               AVVideoWidthKey: NSNumber(value: 1280),
@@ -137,11 +148,17 @@ final class SWRecorder: NSObject {
     self.audioLastTimingInfo = nil
   }
   
+  // Multiple shoot support
   private class SaveStateTimingInfo {
+    var begin: CMTime
     var last: CMTime?
     var oldDiff: CMTime?
     var diff: CMTime?
     var pause: CMTime?
+    
+    init(beginTime time: CMTime) {
+      begin = time
+    }
     
     func reset() {
       last = nil
@@ -155,6 +172,10 @@ final class SWRecorder: NSObject {
       oldDiff = diff
       diff = nil
     }
+    
+    func predictDuration(currentTime time: CMTime) -> CMTime {
+      return time - begin - (diff ?? CMTime.zero)
+    }
   }
   private var videoLastTimingInfo: SaveStateTimingInfo?
   private var audioLastTimingInfo: SaveStateTimingInfo?
@@ -165,12 +186,20 @@ final class SWRecorder: NSObject {
     executeWritingVideoJob { [weak self] in
       guard let this = self else { return }
       let bufferTimestamp = CMSampleBufferGetPresentationTimeStamp(buffer)
+      if let predictDuration = this.videoLastTimingInfo?.predictDuration(currentTime: bufferTimestamp) {
+        if CMTimeGetSeconds(predictDuration) > this.minimumDurationAllowed {
+          this.output?.recorderReadyForCollection()
+        } else if CMTimeGetSeconds(predictDuration) > this.maximumDurationAllowed {
+          this.finish()
+          return
+        }
+      }
       if this.assetWriter?.status == .unknown {
         this.assetWriter?.startWriting()
         this.assetWriter?.startSession(atSourceTime: bufferTimestamp)
         //create last info for video and audio buffer
-        this.videoLastTimingInfo = SaveStateTimingInfo()
-        this.audioLastTimingInfo = SaveStateTimingInfo()
+        this.videoLastTimingInfo = SaveStateTimingInfo(beginTime: bufferTimestamp)
+        this.audioLastTimingInfo = SaveStateTimingInfo(beginTime: bufferTimestamp)
       } else if this.assetWriter?.status == .writing, this.videoWriterInput?.isReadyForMoreMediaData == true, let outBuffer = this.processBuffer(buffer, timingInfo: this.videoLastTimingInfo) {
         autoreleasepool(invoking: { () -> () in
           this.videoWriterInput?.append(outBuffer)
@@ -222,121 +251,9 @@ final class SWRecorder: NSObject {
   }
   
   fileprivate func didFinishRecordingVideo() {
+    DispatchQueue.main.async {
+      self.output?.recorderDidFinish(withFile: self.workingFileURL)
+    }
   }
+  
 }
-
-
-
-//fileprivate func mergeVideo() {
-//  let mixComposition : AVMutableComposition = AVMutableComposition()
-//  var mutableCompositionVideoTrack : [AVMutableCompositionTrack] = []
-//  var mutableCompositionAudioTrack : [AVMutableCompositionTrack] = []
-//  let totalVideoCompositionInstruction : AVMutableVideoCompositionInstruction = AVMutableVideoCompositionInstruction()
-//  
-//  
-//  //start merge
-//  let aVideoAsset : AVAsset = AVAsset(url: tempRecordVideoURL())
-//  let aAudioAsset : AVAsset = AVAsset(url: self.sourceAudioFileURL!)
-//  
-//  mutableCompositionVideoTrack.append(mixComposition.addMutableTrack(withMediaType: AVMediaType.video, preferredTrackID: kCMPersistentTrackID_Invalid)!)
-//  mutableCompositionAudioTrack.append( mixComposition.addMutableTrack(withMediaType: AVMediaType.audio, preferredTrackID: kCMPersistentTrackID_Invalid)!)
-//  
-//  let aVideoAssetTrack : AVAssetTrack = aVideoAsset.tracks[0]
-//  let aAudioAssetTrack : AVAssetTrack = aAudioAsset.tracks[0]
-//  
-//  do{
-//    try mutableCompositionVideoTrack[0].insertTimeRange(CMTimeRangeMake(start: CMTime.zero, duration: aVideoAssetTrack.timeRange.duration), of: aVideoAssetTrack, at: CMTime.zero)
-//    
-//    //In my case my audio file is longer then video file so i took videoAsset duration
-//    //instead of audioAsset duration
-//    
-//    try mutableCompositionAudioTrack[0].insertTimeRange(CMTimeRangeMake(start: CMTime.zero, duration: aVideoAssetTrack.timeRange.duration), of: aAudioAssetTrack, at: CMTime.zero)
-//    
-//    //Use this instead above line if your audiofile and video file's playing durations are same
-//    
-//    //            try mutableCompositionAudioTrack[0].insertTimeRange(CMTimeRangeMake(kCMTimeZero, aVideoAssetTrack.timeRange.duration), ofTrack: aAudioAssetTrack, atTime: kCMTimeZero)
-//    
-//  }catch{
-//    
-//  }
-//  
-//  totalVideoCompositionInstruction.timeRange = CMTimeRangeMake(start: CMTime.zero,duration: aVideoAssetTrack.timeRange.duration )
-//  
-//  let mutableVideoComposition : AVMutableVideoComposition = AVMutableVideoComposition()
-//  mutableVideoComposition.frameDuration = CMTimeMake(value: 1, timescale: 30)
-//  
-//  mutableVideoComposition.renderSize = CGSize(width: 720, height: 1280)
-//  
-//  //        playerItem = AVPlayerItem(asset: mixComposition)
-//  //        player = AVPlayer(playerItem: playerItem!)
-//  //
-//  //
-//  //        AVPlayerVC.player = player
-//  
-//  
-//  
-//  //find your video on this URl
-//  let savePathUrl : NSURL = NSURL(fileURLWithPath: NSHomeDirectory() + "/Documents/newVideo.mp4")
-//  
-//  let assetExport: AVAssetExportSession = AVAssetExportSession(asset: mixComposition, presetName: AVAssetExportPresetHighestQuality)!
-//  assetExport.outputFileType = AVFileType.mp4
-//  assetExport.outputURL = recordedVideoURL()
-//  assetExport.shouldOptimizeForNetworkUse = true
-//  
-//  assetExport.exportAsynchronously { () -> Void in
-//    switch assetExport.status {
-//      
-//    case AVAssetExportSession.Status.completed:
-//      
-//      //Uncomment this if u want to store your video in asset
-//      
-//      //let assetsLib = ALAssetsLibrary()
-//      //assetsLib.writeVideoAtPathToSavedPhotosAlbum(savePathUrl, completionBlock: nil)
-//      
-//      print("success")
-//    case  AVAssetExportSession.Status.failed:
-//      print("failed \(assetExport.error)")
-//    case AVAssetExportSession.Status.cancelled:
-//      print("cancelled \(assetExport.error)")
-//    default:
-//      print("complete")
-//    }
-//  }
-//}
-
-
-
-//func processAudioData(audioData: UnsafePointer<AudioBufferList>, audioFormat inputFormat: CMFormatDescription, timingInfo: CMSampleTimingInfo, framesNumber: UInt32, mono: Bool) -> CMSampleBuffer? {
-//  var sbuf : CMSampleBuffer?
-//  var status : OSStatus?
-//  var format: CMFormatDescription?
-//
-//  let audioFormat = CMAudioFormatDescriptionGetStreamBasicDescription(inputFormat)
-//  var timing = timingInfo
-//
-//  var acl = AudioChannelLayout();
-//  bzero(&acl, MemoryLayout<AudioChannelLayout>.size);
-//  acl.mChannelLayoutTag = mono ? kAudioChannelLayoutTag_Mono : kAudioChannelLayoutTag_Stereo;
-//
-//  status = CMAudioFormatDescriptionCreate(allocator: kCFAllocatorDefault, asbd: audioFormat!, layoutSize: MemoryLayout<AudioChannelLayout>.size, layout: &acl, magicCookieSize: 0, magicCookie: nil, extensions: nil, formatDescriptionOut: &format)
-//  if status != noErr {
-//    print("Error CMAudioFormatDescriptionCreater :\(String(describing: status?.description))")
-//    return nil
-//  }
-//
-//  status = CMSampleBufferCreate(allocator: kCFAllocatorDefault, dataBuffer: nil, dataReady: false, makeDataReadyCallback: nil, refcon: nil, formatDescription: format, sampleCount: CMItemCount(framesNumber), sampleTimingEntryCount: 1, sampleTimingArray: &timing, sampleSizeEntryCount: 0, sampleSizeArray: nil, sampleBufferOut: &sbuf)
-//  if status != noErr {
-//    print("Error CMSampleBufferCreate :\(String(describing: status?.description))")
-//    return nil
-//  }
-//
-//  guard let buf = sbuf else { return nil}
-//  status = CMSampleBufferSetDataBufferFromAudioBufferList(buf, blockBufferAllocator: kCFAllocatorDefault, blockBufferMemoryAllocator: kCFAllocatorDefault, flags: 0, bufferList: audioData)
-//  let audiobufferListRaw: AudioBufferList = audioData.pointee
-//  if status != noErr {
-//    print("Error cCMSampleBufferSetDataBufferFromAudioBufferList :\(String(describing: status?.description))")
-//    return nil
-//  }
-//
-//  return buf
-//}
